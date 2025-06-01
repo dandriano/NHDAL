@@ -1,0 +1,21 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+VisualStudioVersion = 17.4.32804.182
+MinimumVisualStudioVersion = 16.0.0.0
+Project("{4DFFBDA9-1736-4AF1-B52C-FE2DD457F8A4}") = "NHDAL", "NHDAL\NHDAL.csproj", "{222D25BB-192A-4391-8E1C-E45E7DB203AA}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{222D25BB-192A-4391-8E1C-E45E7DB203AA}.Debug|Any CPU = Debug|Any CPU
+		{222D25BB-192A-4391-8E1C-E45E7DB203AA}.Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {0F984457-7004-4286-8DB9-0E4983EEAC1E}
+	EndGlobalSection
+EndGlobal
