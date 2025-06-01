@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 namespace NHDAL
 {
     /// <summary>
-    /// A unit of work implementation built on NHibernate,
+    /// A unit of work implementation built around NHibernate <see cref="ISession"/>,
     /// leveraging its LINQ capabilities via <see cref="Query"/>. 
     /// </summary>
     /// <remarks>
