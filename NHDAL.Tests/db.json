@@ -1,0 +1,9 @@
+{
+  "UnitOfWorkFactoryOptions": {
+    "Secret": "<your secret>",
+    "Username": "<your username>",
+    "Host": "127.0.0.1",
+    "Port": "5432",
+    "Database": "test"
+  }
+}

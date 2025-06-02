@@ -8,7 +8,7 @@ using System.Text;
 
 namespace NHDAL
 {
-    public static class ConfigurationHelper
+    public static class ConfigurationExtensions
     {
         public static Configuration CreateConfiguration(UnitOfWorkFactoryOptions options)
         {
@@ -41,23 +41,35 @@ namespace NHDAL
             if (!string.IsNullOrWhiteSpace(applicationName))
                 sb.Append($";ApplicationName={applicationName}");
 
-            var currentAssembly = Assembly.GetExecutingAssembly();
             var cfg = new Configuration();
+
+            cfg.AddAssemblyMappings();
+            cfg.SetupDataBaseIntegration<PostgreSQL83Dialect>(sb.ToString());
+
+            return cfg;
+        }
+        public static Configuration SetupDataBaseIntegration<TDialect>(this Configuration config, string connectionString) where TDialect : Dialect
+        {
+            config.DataBaseIntegration(db =>
+            {
+                db.ConnectionString = connectionString;
+                db.Dialect<TDialect>();
+            });
+
+            return config;
+        }
+        public static Configuration AddAssemblyMappings(this Configuration config)
+        {
+            var currentAssembly = Assembly.GetExecutingAssembly();
             var mapper = new ConventionModelMapper();
 
             mapper.AddMappings(currentAssembly.GetExportedTypes()
                                 .Where(type => type.Namespace!.EndsWith("Maps")));
             var mapping = mapper.CompileMappingFor(currentAssembly.GetExportedTypes()
                                                     .Where(type => type.Namespace!.EndsWith("Entities")));
-            cfg.AddMapping(mapping);
+            config.AddMapping(mapping);
 
-            cfg.DataBaseIntegration(db =>
-            {
-                db.ConnectionString = sb.ToString();
-                db.Dialect<PostgreSQL83Dialect>();
-            });
-
-            return cfg;
+            return config;
         }
     }
 }

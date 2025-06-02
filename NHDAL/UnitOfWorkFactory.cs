@@ -16,7 +16,7 @@ namespace NHDAL
         public UnitOfWorkFactory(IOptions<UnitOfWorkFactoryOptions> options)
         {
             _options = options.Value;
-            _sessionFactory = ConfigurationHelper.CreateConfiguration(_options)
+            _sessionFactory = ConfigurationExtensions.CreateConfiguration(_options)
                                                  .BuildSessionFactory();
         }
         public IUnitOfWork OpenUnitOfWork()
