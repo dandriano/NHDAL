@@ -1,5 +1,4 @@
 using NHibernate;
-using NHibernate.Engine;
 using NHibernate.Persister.Entity;
 using System;
 using System.Collections.Generic;
@@ -7,7 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace NHDAL
+namespace NHDAL.Interfaces
 {
     /// <summary>
     /// TODO: Comments
@@ -17,8 +16,6 @@ namespace NHDAL
     /// </remarks>
     public interface IUnitOfWork : IDisposable
     {
-        ISessionImplementor Implementation { get; }
-        IPersistenceContext PersistenceContext { get; }
         IEntityPersister GetPersister<TEntity>() where TEntity : class;
         ISQLQuery CreateSQLQuery(string sql);
         IQueryable<TEntity> Query<TEntity>() where TEntity : class;

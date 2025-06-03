@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Options;
+using NHDAL.Interfaces;
 using NHibernate;
 using System.Diagnostics.CodeAnalysis;
 
@@ -8,7 +9,7 @@ namespace NHDAL
     /// Threread-safe factory for creating <see cref="IUnitOfWork"/> instances 
     /// backed by NHibernate sessions. 
     /// </summary>
-    public class UnitOfWorkFactory
+    public class UnitOfWorkFactory : IUnitOfWorkFactory
     {
         private readonly UnitOfWorkFactoryOptions _options;
         private readonly ISessionFactory _sessionFactory;
@@ -17,7 +18,7 @@ namespace NHDAL
         {
             _options = options.Value;
             _sessionFactory = ConfigurationExtensions.CreateConfiguration(_options)
-                                                 .BuildSessionFactory();
+                                                     .BuildSessionFactory();
         }
         public IUnitOfWork OpenUnitOfWork()
             => new UnitOfWork(_sessionFactory.OpenSession());

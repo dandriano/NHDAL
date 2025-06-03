@@ -1,5 +1,5 @@
+using NHDAL.Interfaces;
 using NHibernate;
-using NHibernate.Engine;
 using NHibernate.Persister.Entity;
 using System.Collections.Generic;
 using System.Linq;
@@ -22,8 +22,6 @@ namespace NHDAL
     {
         private readonly ISession _session;
         private readonly ITransaction _transaction;
-        public ISessionImplementor Implementation => _session.GetSessionImplementation();
-        public IPersistenceContext PersistenceContext => Implementation.PersistenceContext;
 
         public UnitOfWork(ISession session)
         {
@@ -31,8 +29,12 @@ namespace NHDAL
             _session.FlushMode = FlushMode.Commit;
             _transaction = _session.BeginTransaction();
         }
+        #region [Transaction]
         public void Commit()
-            => _transaction.Commit();
+        {
+            if (_transaction?.IsActive == true)
+                _transaction.Commit();
+        }
         public void Rollback()
         {
             if (_transaction?.IsActive == true)
@@ -48,10 +50,61 @@ namespace NHDAL
             if (_transaction?.IsActive == true)
                 await _transaction.RollbackAsync().ConfigureAwait(false);
         }
+        #endregion
+        #region [Basic]
+        public ISQLQuery CreateSQLQuery(string sql)
+            => _session.CreateSQLQuery(sql);
         public IQueryable<TEntity> Query<TEntity>() where TEntity : class
             => _session.Query<TEntity>();
         public IQueryOver<TEntity, TEntity> QueryOver<TEntity>() where TEntity : class
             => _session.QueryOver<TEntity>();
+        public bool Contains(object obj)
+            => _session.Contains(obj);
+        #endregion
+        #region [CRUD]
+        public void Delete(object obj)
+            => _session.Delete(obj);
+        public async Task DeleteAsync(object obj, CancellationToken cancellationToken = default)
+            => await _session.DeleteAsync(obj, cancellationToken)
+                             .ConfigureAwait(false);
+        public async Task DeleteManyAsync(IEnumerable<object> entities, CancellationToken cancellationToken = default)
+        {
+            foreach (var item in entities)
+                await DeleteAsync(item, cancellationToken).ConfigureAwait(false);
+        }
+        public T Merge<T>(T entity) where T : class
+        {
+            try
+            {
+                _session.SaveOrUpdate(entity);
+            }
+            catch (NonUniqueObjectException)
+            {
+                _session.Lock(entity, LockMode.None);
+                // return _session.Merge(entity);
+                // TODO: Reconcile logic
+            }
+            
+            return entity;
+        }
+        public async Task<T> MergeAsync<T>(T entity, CancellationToken cancellationToken = default) where T : class
+        {
+            try
+            {
+                await _session.SaveOrUpdateAsync(entity, cancellationToken)
+                              .ConfigureAwait(false);
+            }
+            catch (NonUniqueObjectException)
+            {
+                await _session.LockAsync(entity, LockMode.None)
+                              .ConfigureAwait(false);
+                // return await _session.MergeAsync(entity, cancellationToken)
+                //                      .ConfigureAwait(false);
+                // TODO: Reconcile logic
+            }
+
+            return entity;
+        }
         public async Task<List<TEntity>> MergeManyAsync<TEntity>(IEnumerable<TEntity> entities, CancellationToken cancellationToken = default)
             where TEntity : class
         {
@@ -61,44 +114,6 @@ namespace NHDAL
                 result.Add(await MergeAsync(item, cancellationToken).ConfigureAwait(false));
 
             return result;
-        }
-        public async Task DeleteManyAsync(IEnumerable<object> entities, CancellationToken cancellationToken = default)
-        {
-            foreach (var item in entities)
-                await DeleteAsync(item, cancellationToken).ConfigureAwait(false);
-        }
-        public bool Contains(object obj)
-            => _session.Contains(obj);
-        public void Delete(object obj)
-            => _session.Delete(obj);
-        public async Task DeleteAsync(object obj, CancellationToken cancellationToken = default)
-            => await _session.DeleteAsync(obj, cancellationToken).ConfigureAwait(false);
-        public T Merge<T>(T entity) where T : class
-        {
-            try
-            {
-                _session.SaveOrUpdate(entity);
-
-                return entity;
-            }
-            catch (NonUniqueObjectException)
-            {
-                return _session.Merge(entity);
-            }
-        }
-        public async Task<T> MergeAsync<T>(T entity, CancellationToken cancellationToken = default) where T : class
-        {
-            try
-            {
-                await _session.SaveOrUpdateAsync(entity, cancellationToken).ConfigureAwait(false);
-
-                return entity;
-            }
-            catch (NonUniqueObjectException)
-            {
-                return await _session.MergeAsync(entity, cancellationToken).ConfigureAwait(false);
-            }
-
         }
         public async Task<T> SaveAsync<T>(T entity, CancellationToken cancellationToken = default) where T : class
         {
@@ -113,9 +128,12 @@ namespace NHDAL
             return entity;
         }
         public IEntityPersister GetPersister<TEntity>() where TEntity : class
-            => Implementation.Factory.TryGetEntityPersister(typeof(TEntity).FullName);
-        public ISQLQuery CreateSQLQuery(string sql)
-            => _session.CreateSQLQuery(sql);
+        {
+            return _session.GetSessionImplementation()
+                           .Factory
+                           .TryGetEntityPersister(typeof(TEntity).FullName);
+        }
+        #endregion
         public void Dispose()
         {
             try
