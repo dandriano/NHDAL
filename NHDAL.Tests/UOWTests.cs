@@ -17,8 +17,9 @@ namespace NHDAL.Tests
         }
 
         [Test]
-        public void UOWTest()
+        public void BuildSchemaTest()
         {
+            _db.BuildSchema();
             using var ctx = _db.OpenUnitOfWork();
             var users = ctx.Query<User>().ToList();
 

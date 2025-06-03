@@ -14,7 +14,7 @@ namespace NHDAL.Tests
     /// </summary>
     internal class RegistrarBase
     {
-        private PostgreSqlContainer _postgresContainer;
+        private PostgreSqlContainer _db;
 
         protected ServiceProvider _serviceProvider;
 
@@ -38,22 +38,18 @@ namespace NHDAL.Tests
                             .Build();
 
             // start postgresql container
-            var cn = new UnitOfWorkFactoryOptions();
-            config.GetSection(nameof(UnitOfWorkFactoryOptions)).Bind(cn);
+            var cn = config.GetSection(nameof(UnitOfWorkFactoryOptions)).Get<UnitOfWorkFactoryOptions>()!;
+            _db = new PostgreSqlBuilder()
+                                    .WithImage("postgres:alpine")
+                                    .WithHostname(cn.Host)
+                                    .WithPortBinding(cn.Port)
+                                    .WithDatabase(cn.Database)
+                                    .WithUsername(cn.Username)
+                                    .WithPassword(cn.Secret)
+                                    .Build();
+            await _db.StartAsync();
 
-            _postgresContainer = new PostgreSqlBuilder()
-                .WithImage("postgres:alpine")
-                .WithHostname(cn.Host)
-                .WithPortBinding(cn.Port)
-                .WithDatabase(cn.Database)
-                .WithUsername(cn.Username)
-                .WithPassword(cn.Secret)
-                .Build();
-            await _postgresContainer.StartAsync();
-
-            // null configuration
-            services.AddSingleton<IConfiguration>(config);
-
+            // null logger
             services.AddSingleton<ILoggerFactory>(NullLoggerFactory.Instance);
             services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
 
@@ -66,7 +62,7 @@ namespace NHDAL.Tests
         [OneTimeTearDown]
         public async Task OneTimeTearDown()
         {
-            await _postgresContainer.DisposeAsync();
+            await _db.DisposeAsync();
             _serviceProvider.Dispose();
         }
     }

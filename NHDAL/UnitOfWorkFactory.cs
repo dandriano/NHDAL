@@ -37,5 +37,10 @@ namespace NHDAL
                 return false;
             }
         }
+        public void BuildSchema()
+        {
+            var schema = new NHibernate.Tool.hbm2ddl.SchemaExport(ConfigurationExtensions.CreateConfiguration(_options));
+            schema.Create(true, false);
+        }
     }
 }
