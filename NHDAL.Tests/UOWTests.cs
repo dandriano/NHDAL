@@ -15,7 +15,6 @@ namespace NHDAL.Tests
         {
             _db = _serviceProvider.GetRequiredService<UnitOfWorkFactory>();
         }
-
         [Test]
         public void BuildSchemaTest()
         {

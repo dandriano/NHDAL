@@ -2,6 +2,7 @@ using NHibernate.Cfg;
 using NHibernate.Dialect;
 using NHibernate.Mapping.ByCode;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text;
@@ -17,14 +18,16 @@ namespace NHDAL
                                        options.Port,
                                        options.Database,
                                        options.Username,
-                                       options.ApplicationName);
+                                       options.ApplicationName,
+                                       options.AssemblyName);
         }
         public static Configuration CreateConfiguration(string secret,
                                                         string host = "127.0.0.1",
                                                         string port = "5432",
                                                         string database = "test",
                                                         string username = "postgres",
-                                                        string applicationName = "")
+                                                        string applicationName = "",
+                                                        string assemblyName = "")
         {
             if (string.IsNullOrWhiteSpace(secret))
                 throw new ArgumentException("Provide secret");
@@ -42,8 +45,29 @@ namespace NHDAL
                 sb.Append($";ApplicationName={applicationName}");
 
             var cfg = new Configuration();
+            var mappings = new List<Type>();
+            var entities = new List<Type>();
 
-            cfg.AddAssemblyMappings();
+            if (string.IsNullOrEmpty(assemblyName))
+            {
+                var mappingAssembly = Assembly.GetExecutingAssembly();
+                mappings.AddRange(mappingAssembly.GetExportedTypes()
+                                                 .Where(type => type.Namespace?.EndsWith("Maps") ?? false));
+                entities.AddRange(mappingAssembly.GetExportedTypes()
+                                                 .Where(type => type.Namespace?.EndsWith("Entities") ?? false));
+            }
+            else
+            {
+                var mappingAssembly = AppDomain.CurrentDomain
+                                        .GetAssemblies()
+                                        .First(a => a.GetName().Name == assemblyName);
+                mappings.AddRange(mappingAssembly.GetTypes()
+                                                 .Where(type => type.Namespace?.EndsWith("Maps") ?? false));
+                entities.AddRange(mappingAssembly.GetTypes()
+                                                 .Where(type => type.Namespace?.EndsWith("Entities") ?? false));
+            }
+
+            cfg.AddMappings(mappings, entities);
             cfg.SetupDataBaseIntegration<PostgreSQL83Dialect>(sb.ToString());
 
             return cfg;
@@ -58,16 +82,12 @@ namespace NHDAL
 
             return config;
         }
-        public static Configuration AddAssemblyMappings(this Configuration config)
+        public static Configuration AddMappings(this Configuration config, IEnumerable<Type> maps, IEnumerable<Type> entities)
         {
-            var currentAssembly = Assembly.GetExecutingAssembly();
             var mapper = new ConventionModelMapper();
 
-            mapper.AddMappings(currentAssembly.GetExportedTypes()
-                                .Where(type => type.Namespace!.EndsWith("Maps")));
-            var mapping = mapper.CompileMappingFor(currentAssembly.GetExportedTypes()
-                                                    .Where(type => type.Namespace!.EndsWith("Entities")));
-            config.AddMapping(mapping);
+            mapper.AddMappings(maps);
+            config.AddMapping(mapper.CompileMappingFor(entities));
 
             return config;
         }

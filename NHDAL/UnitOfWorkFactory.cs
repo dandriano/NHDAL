@@ -40,7 +40,7 @@ namespace NHDAL
         public void BuildSchema()
         {
             var schema = new NHibernate.Tool.hbm2ddl.SchemaExport(ConfigurationExtensions.CreateConfiguration(_options));
-            schema.Create(true, false);
+            schema.Create(true, true);
         }
     }
 }
