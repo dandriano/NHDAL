@@ -72,7 +72,7 @@ namespace NHDAL
             foreach (var item in entities)
                 await DeleteAsync(item, cancellationToken).ConfigureAwait(false);
         }
-        public T Merge<T>(T entity) where T : class
+        public TEntity Merge<TEntity>(TEntity entity) where TEntity : class
         {
             try
             {
@@ -84,10 +84,19 @@ namespace NHDAL
                 // return _session.Merge(entity);
                 // TODO: Reconcile logic
             }
-            
+
             return entity;
         }
-        public async Task<T> MergeAsync<T>(T entity, CancellationToken cancellationToken = default) where T : class
+        public IEnumerable<TEntity> MergeMany<TEntity>(IEnumerable<TEntity> entities) where TEntity : class
+        {
+            var result = new List<TEntity>();
+
+            foreach (TEntity item in entities)
+                result.Add(Merge(item));
+
+            return result;
+        }
+        public async Task<TEnity> MergeAsync<TEnity>(TEnity entity, CancellationToken cancellationToken = default) where TEnity : class
         {
             try
             {
@@ -105,7 +114,7 @@ namespace NHDAL
 
             return entity;
         }
-        public async Task<List<TEntity>> MergeManyAsync<TEntity>(IEnumerable<TEntity> entities, CancellationToken cancellationToken = default)
+        public async Task<IEnumerable<TEntity>> MergeManyAsync<TEntity>(IEnumerable<TEntity> entities, CancellationToken cancellationToken = default)
             where TEntity : class
         {
             var result = new List<TEntity>();
@@ -115,13 +124,13 @@ namespace NHDAL
 
             return result;
         }
-        public async Task<T> SaveAsync<T>(T entity, CancellationToken cancellationToken = default) where T : class
+        public async Task<TEntity> SaveAsync<TEntity>(TEntity entity, CancellationToken cancellationToken = default) where TEntity : class
         {
             await _session.SaveAsync(entity, cancellationToken).ConfigureAwait(false);
 
             return entity;
         }
-        public async Task<T> UpdateAsync<T>(T entity, CancellationToken cancellationToken = default) where T : class
+        public async Task<TEntity> UpdateAsync<TEntity>(TEntity entity, CancellationToken cancellationToken = default) where TEntity : class
         {
             await _session.UpdateAsync(entity, cancellationToken).ConfigureAwait(false);
 
