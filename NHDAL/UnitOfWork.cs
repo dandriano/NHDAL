@@ -74,17 +74,16 @@ namespace NHDAL
         }
         public TEntity Merge<TEntity>(TEntity entity) where TEntity : class
         {
+            // https://stackoverflow.com/questions/7475363/differences-among-save-update-saveorupdate-merge-methods-in-session
             try
             {
-                _session.SaveOrUpdate(entity);
+                _session.Persist(entity);
             }
             catch (NonUniqueObjectException)
             {
                 _session.Lock(entity, LockMode.None);
                 // return _session.Merge(entity);
-                // TODO: Reconcile logic
             }
-
             return entity;
         }
         public IEnumerable<TEntity> MergeMany<TEntity>(IEnumerable<TEntity> entities) where TEntity : class
