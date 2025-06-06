@@ -77,16 +77,15 @@ namespace NHDAL
             // https://stackoverflow.com/questions/7475363/differences-among-save-update-saveorupdate-merge-methods-in-session
             try
             {
-                // _session.SaveOrUpdate(entity);
-                _session.Persist(entity);
+                _session.SaveOrUpdate(entity);
             }
-            catch (PersistentObjectException)
-            // catch (NonUniqueObjectException)
+            catch (NonUniqueObjectException)
             {
-                // TODO: Reconcile
+                // TODO: Reconcile entity / return entity from Merge (if needed)
                 _session.Lock(entity, LockMode.None);
                 // return _session.Merge(entity);
             }
+
             return entity;
         }
         public IEnumerable<TEntity> MergeMany<TEntity>(IEnumerable<TEntity> entities) where TEntity : class
@@ -107,11 +106,11 @@ namespace NHDAL
             }
             catch (NonUniqueObjectException)
             {
-                await _session.LockAsync(entity, LockMode.None)
+                // TODO: Reconcile entity / return entity from Merge (if needed)
+                await _session.LockAsync(entity, LockMode.None, cancellationToken)
                               .ConfigureAwait(false);
                 // return await _session.MergeAsync(entity, cancellationToken)
                 //                      .ConfigureAwait(false);
-                // TODO: Reconcile logic
             }
 
             return entity;
