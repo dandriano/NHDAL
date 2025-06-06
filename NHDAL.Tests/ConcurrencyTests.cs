@@ -42,23 +42,21 @@ namespace NHDAL.Tests
                 .Select(i =>
                     Task.Run(() =>
                     {
+                        // optimistic concurrency in the example below 
+                        // is only working within the bounds of the ISession 
                         var success = true;
 
                         Thread.Sleep(new Random().Next(1, concurrencyLimit) * 100);
                         TestContext.WriteLine($"{DateTime.Now.Subtract(s).TotalMilliseconds:f0} ms\tuser:{i}\tstart");
-                        var toEdit = User.Nobody;
-                        using (var ctx = _db.OpenUnitOfWork())
-                        {
-                            toEdit = ctx.Query<User>().Single(u => u.Id == targetId);
-                        }
+                        using var ctx = _db.OpenUnitOfWork();
+                        var toEdit = ctx.Query<User>().Single(u => u.Id == targetId);
 
-                        Thread.Sleep(new Random().Next(1, concurrencyLimit ^ 2) * 200);
+                        Thread.Sleep(new Random().Next(1, concurrencyLimit ^ 2) * 1000);
                         TestContext.WriteLine($"{DateTime.Now.Subtract(s).TotalMilliseconds:f0} ms\tuser:{i}\tflush");
                         toEdit.Name = $"HELLO WORLD FROM user{i}";
                         
                         try
                         {
-                            using var ctx = _db.OpenUnitOfWork();
                             ctx.Merge(toEdit);
                             ctx.Commit();
                         }

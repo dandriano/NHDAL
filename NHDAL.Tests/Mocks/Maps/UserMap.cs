@@ -14,7 +14,7 @@ namespace NHDAL.Tests.Mocks.Maps
             Schema("\"public\"");
             Lazy(true);
             DynamicUpdate(true);
-            OptimisticLock(OptimisticLockMode.Version);
+            OptimisticLock(OptimisticLockMode.Dirty);
 
             Id(x => x.Id, map => { map.Column("\"id\""); map.Generator(Generators.Assigned); });
             Version(x => x.Timestamp, map =>
