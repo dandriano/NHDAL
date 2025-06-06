@@ -77,10 +77,13 @@ namespace NHDAL
             // https://stackoverflow.com/questions/7475363/differences-among-save-update-saveorupdate-merge-methods-in-session
             try
             {
+                // _session.SaveOrUpdate(entity);
                 _session.Persist(entity);
             }
-            catch (NonUniqueObjectException)
+            catch (PersistentObjectException)
+            // catch (NonUniqueObjectException)
             {
+                // TODO: Reconcile
                 _session.Lock(entity, LockMode.None);
                 // return _session.Merge(entity);
             }

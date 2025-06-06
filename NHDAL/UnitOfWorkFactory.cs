@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Options;
 using NHDAL.Interfaces;
 using NHibernate;
+using NHibernate.Tool.hbm2ddl;
 using System.Diagnostics.CodeAnalysis;
 
 namespace NHDAL
@@ -39,8 +40,7 @@ namespace NHDAL
         }
         public void BuildSchema()
         {
-            var schema = new NHibernate.Tool.hbm2ddl.SchemaExport(ConfigurationExtensions.CreateConfiguration(_options));
-            schema.Create(true, true);
+            new SchemaExport(ConfigurationExtensions.CreateConfiguration(_options)).Create(false, true);
         }
     }
 }
