@@ -81,6 +81,7 @@ namespace NHDAL
             }
             catch (NonUniqueObjectException)
             {
+                // TODO: Reconcile on stale object?
                 return _session.Merge(entity);
             }
 
