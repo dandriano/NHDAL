@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using NHDAL.Tests.Mocks;
 using NHDAL.Tests.Mocks.Entities;
 using NHibernate;
 using NUnit.Framework;
@@ -24,106 +25,129 @@ namespace NHDAL.Tests
         [Test]
         public void Basic_BuildSchemaTest()
         {
-            using var ctx = _db.OpenUnitOfWork();
-            var users = ctx.Query<User>().ToList();
-
-            Assert.That(users, Is.Empty);
+            if (!_db.TryOpenUnitOfWork(out var ctx))
+            {
+                Assert.Fail();
+                return; 
+            }
+            using (ctx)
+            {
+                Assert.That(ctx.Query<User>().ToList(), Has.Count.Zero);
+            }
         }
         [Test]
         public void Basic_InsertTest()
         {
-            var users = new List<User>()
-            {
-                new User { Name = "AlrigthAlrightAlright" },
-                new User { Name = "SillySandler" },
-                new User { Name = "PerspectiveDiCaprio" },
-            };
+            (var users, var posts, var comments) = MocksHelper.GenerateMockDomainData();
 
-            var userByName = users.ToDictionary(u => u.Name);
-
-            var posts = new List<Post>
+            if (!_db.TryOpenUnitOfWork(out var ctx))
             {
-                new Post
-                {
-                    Author = userByName["PerspectiveDiCaprio"],
-                    Text = "Hello World!",
-                },
-                new Post
-                {
-                    Author = userByName["AlrigthAlrightAlright"],
-                    Text = "Is anyone here?",
-                },
-                new Post
-                {
-                    Author = userByName["SillySandler"],
-                    Text = "My blog is here!",
-                }
-            };
-
-            // add posts to users
-            foreach (var post in posts)
-            {
-                post.Author.Posts.Add(post);
+                Assert.Fail();
+                return; 
             }
 
-            var comments = new List<Comment>
+            using (ctx)
             {
-                new Comment
-                {
-                    Author = userByName["SillySandler"],
-                    Post = posts[0],
-                    Text = "Nice post!",
-                },
-                new Comment
-                {
-                    Author = userByName["AlrigthAlrightAlright"],
-                    Post = posts[0],
-                    Text = "Thanks for sharing.",
-                },
-                new Comment
-                {
-                    Author = userByName["PerspectiveDiCaprio"],
-                    Post = posts[1],
-                    Text = "Absolutely agree!",
-                },
-                new Comment
-                {
-                    Author = userByName["PerspectiveDiCaprio"],
-                    Post = posts[2],
-                    Text = "Good morning to you too!",
-                }
-            };
-
-            // Add comments to posts and users
-            foreach (var comment in comments)
-            {
-                comment.Post.Comments.Add(comment);
-                comment.Author.Comments.Add(comment);
+                ctx.MergeMany(users);
+                ctx.Commit();
             }
 
-            using (var ctx1 = _db.OpenUnitOfWork())
+            Thread.Sleep(500);
+
+            if (!_db.TryOpenUnitOfWork(out ctx))
             {
-                ctx1.MergeMany(users);
-                ctx1.Commit();
+                Assert.Fail();
+                return;
             }
 
-            using var ctx2 = _db.OpenUnitOfWork();
-            Assert.That(ctx2.Query<User>().ToList(), Has.Count.EqualTo(users.Count));
-            Assert.That(ctx2.Query<Post>().ToList(), Has.Count.EqualTo(posts.Count));
-            Assert.That(ctx2.Query<Comment>().ToList(), Has.Count.EqualTo(comments.Count));
+            Assert.Multiple(() =>
+            {
+                Assert.That(ctx.Query<User>().ToList(), Has.Count.EqualTo(users.Count));
+                Assert.That(ctx.Query<Post>().ToList(), Has.Count.EqualTo(posts.Count));
+                Assert.That(ctx.Query<Comment>().ToList(), Has.Count.EqualTo(comments.Count));
+            });
         }
+        [Test]
+        public void Basic_VersionChanged_ReturnsFromCash_Test()
+        {
+            (var users, _, _) = MocksHelper.GenerateMockDomainData();
+            if (!_db.TryOpenUnitOfWork(out var ctx))
+            {
+                Assert.Fail();
+                return; 
+            }
 
+            using (ctx)
+            {
+                users = (List<User>)ctx.MergeMany(users);
+                ctx.Commit();
+            }
+
+            Thread.Sleep(1500);
+
+            users[0].Name = "Incognito";
+            if (!_db.TryOpenUnitOfWork(out ctx))
+            {
+                Assert.Fail();
+                return; 
+            }
+            using (ctx)
+            {
+                var detachedUser = ctx.Merge(users[0]);
+                var targetUser = ctx.Query<User>().Single(u => users[0].Id == u.Id);
+                Assert.Multiple(() =>
+                {
+                    Assert.That(detachedUser.Name, Is.EqualTo(targetUser.Name));
+                    Assert.That(detachedUser.Timestamp, Is.EqualTo(targetUser.Timestamp));
+                });
+            }
+        }
+        [Test]
+        public void Basic_VersionChanged_OutsideOfUOW_Test()
+        {
+            (var users, _, _) = MocksHelper.GenerateMockDomainData();
+            if (!_db.TryOpenUnitOfWork(out var ctx))
+            {
+                Assert.Fail();
+                return; 
+            }
+            using (ctx)
+            {
+                users = (List<User>)ctx.MergeMany(users);
+                ctx.Commit();
+            }
+
+            Thread.Sleep(1500);
+            users[0].Name = "Incognito";
+            
+            if (!_db.TryOpenUnitOfWork(out ctx))
+            {
+                Assert.Fail();
+                return; 
+            }
+            using (ctx)
+            {
+                var targetUser = ctx.Query<User>().Single(u => users[0].Id == u.Id);
+                var detachedUser = ctx.Merge(users[0]);
+                Assert.Multiple(() =>
+                {
+                    Assert.That(detachedUser.Name, Is.EqualTo(targetUser.Name));
+                    Assert.That(detachedUser.Timestamp, Is.EqualTo(targetUser.Timestamp));
+                });
+            }
+        }
         [TestCase(5)]
         public async Task OptimisticConcurrency_WithinBoundariesOfUOW_Test(int concurrencyLimit)
         {
-            var users = new List<User>()
-            {
-                new User { Name = "AlrigthAlrightAlright" },
-                new User { Name = "SillySandler" },
-                new User { Name = "PerspectiveDiCaprio" },
-            };
+            (var users, _, _) = MocksHelper.GenerateMockDomainData();
             var targetId = users[^1].Id;
-            using (var ctx = _db.OpenUnitOfWork())
+            
+            if (!_db.TryOpenUnitOfWork(out var ctx))
+            {
+                Assert.Fail();
+                return;
+            }
+            using (ctx)
             {
                 await ctx.MergeManyAsync(users);
                 await ctx.CommitAsync();
@@ -169,14 +193,15 @@ namespace NHDAL.Tests
         [TestCase(5)]
         public async Task OptimisticConcurrency_OutsideBoundariesOfUOW_Test(int concurrencyLimit)
         {
-            var users = new List<User>()
-            {
-                new User { Name = "AlrigthAlrightAlright" },
-                new User { Name = "SillySandler" },
-                new User { Name = "PerspectiveDiCaprio" },
-            };
+            (var users, _, _) = MocksHelper.GenerateMockDomainData();
             var targetId = users[^1].Id;
-            using (var ctx = _db.OpenUnitOfWork())
+
+            if (!_db.TryOpenUnitOfWork(out var ctx))
+            {
+                Assert.Fail();
+                return;
+            }
+            using (ctx)
             {
                 await ctx.MergeManyAsync(users);
                 await ctx.CommitAsync();

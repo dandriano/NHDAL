@@ -81,9 +81,7 @@ namespace NHDAL
             }
             catch (NonUniqueObjectException)
             {
-                // TODO: Reconcile entity / return entity from Merge (if needed)
-                _session.Lock(entity, LockMode.None);
-                // return _session.Merge(entity);
+                return _session.Merge(entity);
             }
 
             return entity;

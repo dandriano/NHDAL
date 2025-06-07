@@ -26,8 +26,6 @@ namespace NHDAL
 
         public bool TryOpenUnitOfWork([MaybeNullWhen(false)] out IUnitOfWork pc)
         {
-            pc = null;
-
             try
             {
                 pc = OpenUnitOfWork();
@@ -35,6 +33,7 @@ namespace NHDAL
             }
             catch
             {
+                pc = null;
                 return false;
             }
         }
