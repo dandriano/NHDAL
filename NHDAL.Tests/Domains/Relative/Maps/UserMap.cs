@@ -1,16 +1,16 @@
-﻿using NHDAL.Tests.Mocks.Entities;
+﻿using NHDAL.Tests.Domains.Relative.Entities;
 using NHibernate.Mapping.ByCode;
 using NHibernate.Mapping.ByCode.Conformist;
 using NHibernate.Type;
 using System;
 
-namespace NHDAL.Tests.Mocks.Maps
+namespace NHDAL.Tests.Domains.Relative.Maps
 {
-    internal class CommentMap : ClassMapping<Comment>
+    public class UserMap : ClassMapping<User>
     {
-        public CommentMap()
+        public UserMap()
         {
-            Table("\"comments\"");
+            Table("\"users\"");
             Schema("\"public\"");
 
             Lazy(true);
@@ -26,8 +26,9 @@ namespace NHDAL.Tests.Mocks.Maps
                 map.UnsavedValue(DateTime.MinValue);
             });
 
-            Property(x => x.Text, map => map.Column("\"text\""));
-            ManyToOne(x => x.Author, map => { map.Column("\"author_id\""); map.Cascade(Cascade.None); });
+            Property(x => x.Name, map => map.Column("\"name\""));
+            Set(x => x.Posts, colmap => { colmap.Key(x => x.Column("\"author_id\"")); colmap.Inverse(true); colmap.Cascade(Cascade.All | Cascade.DeleteOrphans); }, map => { map.OneToMany(); });
+            Set(x => x.Comments, colmap => { colmap.Key(x => x.Column("\"author_id\"")); colmap.Inverse(true); colmap.Cascade(Cascade.All | Cascade.DeleteOrphans); }, map => { map.OneToMany(); });
         }
     }
 }

@@ -2,7 +2,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using NUnit.Framework;
 using System.Threading.Tasks;
 using Testcontainers.PostgreSql;
 
@@ -12,14 +11,12 @@ namespace NHDAL.Tests
     /// <summary>
     /// Base class for registrars.
     /// </summary>
-    internal class RegistrarBase
+    public class RegistrarBase
     {
-        private PostgreSqlContainer _db;
+        private PostgreSqlContainer _db = null!;
+        protected ServiceProvider _serviceProvider = null!;
 
-        protected ServiceProvider _serviceProvider;
-
-        [OneTimeSetUp]
-        public async Task OneTimeSetup()
+        public virtual async Task OneTimeSetup()
         {
             var services = new ServiceCollection();
 
@@ -38,6 +35,7 @@ namespace NHDAL.Tests
                             .Build();
 
             // start postgresql container
+            // to-do dynamic ports
             var cn = config.GetSection(nameof(UnitOfWorkFactoryOptions)).Get<UnitOfWorkFactoryOptions>()!;
             _db = new PostgreSqlBuilder()
                                     .WithImage("postgres:alpine")
@@ -54,13 +52,12 @@ namespace NHDAL.Tests
             services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
 
             services.Configure<UnitOfWorkFactoryOptions>(config.GetSection(nameof(UnitOfWorkFactoryOptions)));
-            services.AddSingleton<UnitOfWorkFactory>();
+            // transient between tests, testing dispose
+            services.AddTransient<UnitOfWorkFactory>();
 
             _serviceProvider = services.BuildServiceProvider();
         }
-
-        [OneTimeTearDown]
-        public async Task OneTimeTearDown()
+        public virtual async Task OneTimeTearDown()
         {
             await _db.DisposeAsync();
             _serviceProvider.Dispose();

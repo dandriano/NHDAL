@@ -2,6 +2,7 @@ using Microsoft.Extensions.Options;
 using NHDAL.Interfaces;
 using NHibernate;
 using NHibernate.Tool.hbm2ddl;
+using System;
 using System.Diagnostics.CodeAnalysis;
 
 namespace NHDAL
@@ -10,7 +11,7 @@ namespace NHDAL
     /// Threread-safe factory for creating <see cref="IUnitOfWork"/> instances 
     /// backed by NHibernate sessions. 
     /// </summary>
-    public class UnitOfWorkFactory : IUnitOfWorkFactory
+    public class UnitOfWorkFactory : IUnitOfWorkFactory, IDisposable
     {
         private readonly UnitOfWorkFactoryOptions _options;
         private readonly ISessionFactory _sessionFactory;
@@ -40,6 +41,11 @@ namespace NHDAL
         public void BuildSchema()
         {
             new SchemaExport(ConfigurationExtensions.CreateConfiguration(_options)).Create(false, true);
+        }
+
+        public void Dispose()
+        {
+            _sessionFactory.Dispose();
         }
     }
 }

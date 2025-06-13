@@ -1,5 +1,5 @@
 using NHibernate.Cfg;
-using NHibernate.Dialect;
+using NHibernate.Extensions.Npgsql;
 using NHibernate.Mapping.ByCode;
 using System;
 using System.Collections.Generic;
@@ -47,37 +47,37 @@ namespace NHDAL
             var cfg = new Configuration();
             var mappings = new List<Type>();
             var entities = new List<Type>();
-
+            Assembly mappingAssembly = null!;
             if (string.IsNullOrEmpty(assemblyName))
             {
-                var mappingAssembly = Assembly.GetExecutingAssembly();
-                mappings.AddRange(mappingAssembly.GetExportedTypes()
-                                                 .Where(type => type.Namespace?.EndsWith("Maps") ?? false));
-                entities.AddRange(mappingAssembly.GetExportedTypes()
-                                                 .Where(type => type.Namespace?.EndsWith("Entities") ?? false));
+                mappingAssembly = Assembly.GetExecutingAssembly();
             }
             else
             {
-                var mappingAssembly = AppDomain.CurrentDomain
+                mappingAssembly = AppDomain.CurrentDomain
                                         .GetAssemblies()
                                         .First(a => a.GetName().Name == assemblyName);
-                mappings.AddRange(mappingAssembly.GetTypes()
-                                                 .Where(type => type.Namespace?.EndsWith("Maps") ?? false));
-                entities.AddRange(mappingAssembly.GetTypes()
-                                                 .Where(type => type.Namespace?.EndsWith("Entities") ?? false));
             }
 
+            mappings.AddRange(mappingAssembly.GetExportedTypes()
+                                 .Where(type => type.Namespace?.EndsWith("Maps") ?? false));
+            entities.AddRange(mappingAssembly.GetExportedTypes()
+                                             .Where(type => type.Namespace?.EndsWith("Entities") ?? false));
+
             cfg.AddMappings(mappings, entities);
-            cfg.SetupDataBaseIntegration<PostgreSQL83Dialect>(sb.ToString());
+            cfg.SetupDataBaseIntegration<NpgsqlDialect, NpgsqlDriver>(sb.ToString());
 
             return cfg;
         }
-        public static Configuration SetupDataBaseIntegration<TDialect>(this Configuration config, string connectionString) where TDialect : Dialect
+        public static Configuration SetupDataBaseIntegration<TDialect, TDriver>(this Configuration config, string connectionString)
+            where TDialect : NHibernate.Dialect.Dialect
+            where TDriver : NHibernate.Driver.IDriver
         {
             config.DataBaseIntegration(db =>
             {
                 db.ConnectionString = connectionString;
                 db.Dialect<TDialect>();
+                db.Driver<TDriver>();
             });
 
             return config;

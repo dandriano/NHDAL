@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
-using NHDAL.Tests.Mocks;
-using NHDAL.Tests.Mocks.Entities;
+using NHDAL.Tests.Domains;
+using NHDAL.Tests.Domains.EAV.Entities;
+using NHDAL.Tests.Domains.Relative.Entities;
 using NHibernate;
 using NUnit.Framework;
 using System;
@@ -12,15 +13,28 @@ using System.Threading.Tasks;
 namespace NHDAL.Tests
 {
     [TestFixture]
-    internal class UOWTests : RegistrarBase
+    public class UOWTests : RegistrarBase
     {
         private UnitOfWorkFactory _db;
 
+        [OneTimeSetUp]
+        public override async Task OneTimeSetup()
+        {
+            await base.OneTimeSetup();
+
+            _db = _serviceProvider.GetRequiredService<UnitOfWorkFactory>();
+        }
         [SetUp]
         public void SetUp()
         {
-            _db = _serviceProvider.GetRequiredService<UnitOfWorkFactory>();
             _db.BuildSchema();
+        }
+        [OneTimeTearDown]
+        public override async Task OneTimeTearDown()
+        {
+            _db.Dispose();
+
+            await base.OneTimeTearDown();
         }
         [Test]
         public void Basic_BuildSchemaTest()
@@ -28,7 +42,7 @@ namespace NHDAL.Tests
             if (!_db.TryOpenUnitOfWork(out var ctx))
             {
                 Assert.Fail();
-                return; 
+                return;
             }
 
             using (ctx)
@@ -39,11 +53,11 @@ namespace NHDAL.Tests
         [Test]
         public void Basic_InsertTest()
         {
-            (var users, var posts, var comments) = MocksHelper.GenerateMockDomainData();
+            (var users, var posts, var comments) = DomainsHelper.GenerateRelativeDomainData();
             if (!_db.TryOpenUnitOfWork(out var ctx))
             {
                 Assert.Fail();
-                return; 
+                return;
             }
 
             using (ctx)
@@ -59,7 +73,7 @@ namespace NHDAL.Tests
                 Assert.Fail();
                 return;
             }
-            
+
             using (ctx)
             {
                 Assert.Multiple(() =>
@@ -71,14 +85,50 @@ namespace NHDAL.Tests
             }
         }
         [Test]
+        public void Basic_InsertEAVTest()
+        {
+            (var types, var attributes, var records) = DomainsHelper.GenerateEAVDomainData();
+            if (!_db.TryOpenUnitOfWork(out var ctx))
+            {
+                Assert.Fail();
+                return;
+            }
+
+            using (ctx)
+            {
+                ctx.MergeMany(types);
+                ctx.MergeMany(attributes);
+                ctx.MergeMany(records);
+                ctx.Commit();
+            }
+
+            Thread.Sleep(500);
+
+            if (!_db.TryOpenUnitOfWork(out ctx))
+            {
+                Assert.Fail();
+                return;
+            }
+
+            using (ctx)
+            {
+                Assert.Multiple(() =>
+                {
+                    Assert.That(ctx.Query<Entity>().ToList(), Has.Count.EqualTo(types.Count));
+                    Assert.That(ctx.Query<Domains.EAV.Entities.Attribute>().ToList(), Has.Count.EqualTo(attributes.Count));
+                    Assert.That(ctx.Query<EntityRecord>().ToList(), Has.Count.EqualTo(records.Count));
+                });
+            }
+        }
+        [Test]
         public void Basic_VersionIncrement_Test()
         {
             if (!_db.TryOpenUnitOfWork(out var ctx))
             {
                 Assert.Fail();
-                return; 
+                return;
             }
-                
+
             var user = new User { Name = "McConaughey" };
             using (ctx)
             {
@@ -91,8 +141,8 @@ namespace NHDAL.Tests
             {
                 Assert.Fail();
                 return;
-            } 
-                
+            }
+
             using (ctx)
             {
                 user = ctx.Query<User>().Single(u => u.Name == "McConaughey");
@@ -109,7 +159,7 @@ namespace NHDAL.Tests
                 Assert.Fail();
                 return;
             }
-                
+
             using (ctx)
             {
                 user = ctx.Query<User>().Single(u => u.Name == "McConaissance");
@@ -119,11 +169,11 @@ namespace NHDAL.Tests
         [Test]
         public void Basic_VersionNotIncrement_ReturnsFromCache_Test()
         {
-            (var users, _, _) = MocksHelper.GenerateMockDomainData();
+            (var users, _, _) = DomainsHelper.GenerateRelativeDomainData();
             if (!_db.TryOpenUnitOfWork(out var ctx))
             {
                 Assert.Fail();
-                return; 
+                return;
             }
 
             using (ctx)
@@ -134,7 +184,7 @@ namespace NHDAL.Tests
 
             Thread.Sleep(1500);
             users[0].Name = "Incognito";
-            
+
             if (!_db.TryOpenUnitOfWork(out ctx))
             {
                 Assert.Fail();
@@ -155,11 +205,11 @@ namespace NHDAL.Tests
         [Test]
         public void Basic_VersionNotIncrement_Merge_Test()
         {
-            (var users, _, _) = MocksHelper.GenerateMockDomainData();
+            (var users, _, _) = DomainsHelper.GenerateRelativeDomainData();
             if (!_db.TryOpenUnitOfWork(out var ctx))
             {
                 Assert.Fail();
-                return; 
+                return;
             }
 
             using (ctx)
@@ -170,11 +220,11 @@ namespace NHDAL.Tests
 
             Thread.Sleep(1500);
             users[0].Name = "Incognito";
-            
+
             if (!_db.TryOpenUnitOfWork(out ctx))
             {
                 Assert.Fail();
-                return; 
+                return;
             }
 
             using (ctx)
@@ -197,7 +247,7 @@ namespace NHDAL.Tests
         [Test]
         public void Basic_VersionIncrement_ReturnsFromCache_Test()
         {
-            (var users, _, _) = MocksHelper.GenerateMockDomainData();
+            (var users, _, _) = DomainsHelper.GenerateRelativeDomainData();
             if (!_db.TryOpenUnitOfWork(out var ctx))
             {
                 Assert.Fail();
@@ -233,7 +283,7 @@ namespace NHDAL.Tests
                     Assert.That(detachedUser.Timestamp, Is.Not.EqualTo(targetConcurrentUser.Timestamp));
                 });
             }
-            
+
             if (!_db.TryOpenUnitOfWork(out ctx))
             {
                 Assert.Fail();
@@ -254,11 +304,11 @@ namespace NHDAL.Tests
         [Test]
         public void Basic_VersionIncrement_Merge_Test()
         {
-            (var users, _, _) = MocksHelper.GenerateMockDomainData();
+            (var users, _, _) = DomainsHelper.GenerateRelativeDomainData();
             if (!_db.TryOpenUnitOfWork(out var ctx))
             {
                 Assert.Fail();
-                return; 
+                return;
             }
             using (ctx)
             {
@@ -289,7 +339,7 @@ namespace NHDAL.Tests
                     Assert.That(detachedUser.Timestamp, Is.Not.EqualTo(targetConcurrentUser.Timestamp));
                 });
             }
-            
+
             if (!_db.TryOpenUnitOfWork(out ctx))
             {
                 Assert.Fail();
@@ -328,7 +378,7 @@ namespace NHDAL.Tests
                 Assert.Fail();
                 return;
             }
-                
+
             using (ctx)
             {
                 Assert.That(ctx.Query<User>().ToList(), Has.Count.EqualTo(5));
@@ -337,9 +387,9 @@ namespace NHDAL.Tests
         [TestCase(5)]
         public async Task Concurrency_OptimisticLockWithinUOWBoundaries_Test(int concurrencyLimit)
         {
-            (var users, _, _) = MocksHelper.GenerateMockDomainData();
+            (var users, _, _) = DomainsHelper.GenerateRelativeDomainData();
             var targetId = users[^1].Id;
-            
+
             if (!_db.TryOpenUnitOfWork(out var ctx))
             {
                 Assert.Fail();
@@ -391,7 +441,7 @@ namespace NHDAL.Tests
         [TestCase(5)]
         public async Task Concurrency_OptimisticLockOutsideUOWBoundaries_Test(int concurrencyLimit)
         {
-            (var users, _, _) = MocksHelper.GenerateMockDomainData();
+            (var users, _, _) = DomainsHelper.GenerateRelativeDomainData();
             var targetId = users[^1].Id;
 
             if (!_db.TryOpenUnitOfWork(out var ctx))

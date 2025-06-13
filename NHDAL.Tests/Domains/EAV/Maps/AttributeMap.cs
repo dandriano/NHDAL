@@ -1,21 +1,20 @@
-﻿using NHDAL.Tests.Mocks.Entities;
 using NHibernate.Mapping.ByCode;
 using NHibernate.Mapping.ByCode.Conformist;
 using NHibernate.Type;
 using System;
 
-namespace NHDAL.Tests.Mocks.Maps
+namespace NHDAL.Tests.Domains.EAV.Maps
 {
-    internal class PostMap : ClassMapping<Post>
+    public class AttributeMap : ClassMapping<Entities.Attribute>
     {
-        public PostMap()
+        public AttributeMap()
         {
-            Table("\"posts\"");
+            Table("\"attributes\"");
             Schema("\"public\"");
 
             Lazy(true);
-            DynamicUpdate(true);
             OptimisticLock(OptimisticLockMode.Version);
+            DynamicUpdate(true);
 
             Id(x => x.Id, map => { map.Column("\"id\""); map.Generator(Generators.Assigned); });
             Version(x => x.Timestamp, map =>
@@ -26,9 +25,11 @@ namespace NHDAL.Tests.Mocks.Maps
                 map.UnsavedValue(DateTime.MinValue);
             });
 
-            Property(x => x.Text, map => map.Column("\"text\""));
-            ManyToOne(x => x.Author, map => { map.Column("\"author_id\""); map.Cascade(Cascade.None); });
-            Set(x => x.Comments, colmap => { colmap.Key(x => x.Column("\"user_id\"")); colmap.Inverse(true); colmap.Cascade(Cascade.All | Cascade.DeleteOrphans); }, map => { map.OneToMany(); });
+            Property(x => x.Name, map => map.Column("\"name\""));
+            Property(x => x.Description, map => map.Column("\"description\""));
+            Property(x => x.DisplayName, map => map.Column("\"display_name\""));
+            Property(x => x.ValueType, map => map.Column("\"value_type\""));
+            ManyToOne(x => x.EntityType, map => { map.Column("\"entity_id\""); map.Cascade(Cascade.None); });
         }
     }
 }
