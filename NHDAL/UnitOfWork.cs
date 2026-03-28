@@ -14,7 +14,7 @@ namespace NHDAL
     /// leveraging its LINQ capabilities via <see cref="Query"/>. 
     /// </summary>
     /// <remarks>
-    /// It manages a session (<see cref="ISession"/>) and (partially) a transaction (<see cref="ITransaction"/>),
+    /// It manages a session (<see cref="ISession"/>) and a transaction (<see cref="ITransaction"/>),
     /// with the session configured to flush changes only on commit (<see cref="FlushMode.Commit"/>). 
     /// Key methods related to reattaching detached objects include <see cref="Merge"/> and <see cref="MergeAsync"/>.
     /// The class aims to handle both new and detached entities within a transactional boundary.
@@ -22,17 +22,21 @@ namespace NHDAL
     public class UnitOfWork : IUnitOfWork
     {
         private readonly ISession _session;
-        private readonly ITransaction _transaction;
+        private ITransaction? _transaction;
 
         public UnitOfWork(ISession session)
         {
             _session = session;
             _session.FlushMode = FlushMode.Commit;
-            _transaction = _session.BeginTransaction();
         }
         #region [Transaction]
+        private void EnsureTransaction()
+        {
+            _transaction ??= _session.BeginTransaction();
+        }
         public void Commit()
         {
+            EnsureTransaction();
             if (_transaction?.IsActive == true)
                 _transaction.Commit();
         }
@@ -43,6 +47,7 @@ namespace NHDAL
         }
         public async Task CommitAsync()
         {
+            EnsureTransaction();
             if (_transaction?.IsActive == true)
                 await _transaction.CommitAsync().ConfigureAwait(false);
         }
@@ -54,11 +59,20 @@ namespace NHDAL
         #endregion
         #region [Basic]
         public ISQLQuery CreateSQLQuery(string sql)
-            => _session.CreateSQLQuery(sql);
+        {
+            EnsureTransaction();
+            return _session.CreateSQLQuery(sql);
+        }
         public IQueryable<TEntity> Query<TEntity>() where TEntity : class
-            => _session.Query<TEntity>();
+        {
+            EnsureTransaction();
+            return _session.Query<TEntity>();
+        }
         public IQueryOver<TEntity, TEntity> QueryOver<TEntity>() where TEntity : class
-            => _session.QueryOver<TEntity>();
+        {
+            EnsureTransaction();
+            return _session.QueryOver<TEntity>();   
+        }
         public bool Contains(object obj)
             => _session.Contains(obj);
         #endregion
@@ -76,13 +90,13 @@ namespace NHDAL
         public TEntity Merge<TEntity>(TEntity entity) where TEntity : class
         {
             // https://stackoverflow.com/questions/7475363/differences-among-save-update-saveorupdate-merge-methods-in-session
+            // and also chapter 10 of nhibernate docs
             try
             {
                 _session.SaveOrUpdate(entity);
             }
             catch (NonUniqueObjectException)
             {
-                // TODO: Reconcile on stale object?
                 return _session.Merge(entity);
             }
 
@@ -106,11 +120,8 @@ namespace NHDAL
             }
             catch (NonUniqueObjectException)
             {
-                // TODO: Reconcile entity / return entity from Merge (if needed)
-                await _session.LockAsync(entity, LockMode.None, cancellationToken)
-                              .ConfigureAwait(false);
-                // return await _session.MergeAsync(entity, cancellationToken)
-                //                      .ConfigureAwait(false);
+                return await _session.MergeAsync(entity, cancellationToken)
+                                     .ConfigureAwait(false);
             }
 
             return entity;
@@ -124,18 +135,6 @@ namespace NHDAL
                 result.Add(await MergeAsync(item, cancellationToken).ConfigureAwait(false));
 
             return result;
-        }
-        public async Task<TEntity> SaveAsync<TEntity>(TEntity entity, CancellationToken cancellationToken = default) where TEntity : class
-        {
-            await _session.SaveAsync(entity, cancellationToken).ConfigureAwait(false);
-
-            return entity;
-        }
-        public async Task<TEntity> UpdateAsync<TEntity>(TEntity entity, CancellationToken cancellationToken = default) where TEntity : class
-        {
-            await _session.UpdateAsync(entity, cancellationToken).ConfigureAwait(false);
-
-            return entity;
         }
         public IEntityPersister GetPersister<TEntity>() where TEntity : class
         {
@@ -155,7 +154,6 @@ namespace NHDAL
                 _session.Dispose();
             }
         }
-
         public IAuditReader GetAuditReader()
         {
             return AuditReaderFactory.Get(_session);
