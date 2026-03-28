@@ -66,6 +66,7 @@ namespace NHDAL
 
             cfg.AddMappings(mappings, entities);
             cfg.SetupDataBaseIntegration<NpgsqlDialect, NpgsqlDriver>(sb.ToString());
+            cfg.IntegrateWithEnvers();
 
             return cfg;
         }

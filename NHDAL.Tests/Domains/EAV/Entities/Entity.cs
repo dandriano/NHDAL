@@ -1,12 +1,15 @@
 using NHDAL.Interfaces;
+using NHibernate.Envers.Configuration.Attributes;
 using System;
 using System.Collections.Generic;
 
 namespace NHDAL.Tests.Domains.EAV.Entities
 {
+    [Audited]
+    [AuditTable("entities_aud")]
     public class Entity : IEntity<Guid>
     {
-        public virtual Guid Id { get; init; } = Guid.NewGuid();
+        public virtual Guid Id { get; init; } = Guid.Empty;
         public virtual DateTime Timestamp { get; protected set; }
         public virtual string Description { get; set; } = string.Empty;
         public virtual string Name { get; set; } = string.Empty;

@@ -104,7 +104,12 @@ namespace NHDAL.Tests.Domains
             var srcAttr = new EAV.Entities.Attribute { Name = "sourceId", ValueType = "string", DisplayName = "From Vertex ID", EntityType = connectionType };
             var tgtAttr = new EAV.Entities.Attribute { Name = "targetId", ValueType = "string", DisplayName = "To Vertex ID", EntityType = connectionType };
 
+            // wire inverse collections
             var attributes = new List<EAV.Entities.Attribute> { nameAttr, weightAttr, srcAttr, tgtAttr };
+            foreach (var attribute in attributes)
+            {
+                attribute.EntityType.Attributes.Add(attribute);
+            }
 
             // create sample "project": a graph structure
             var projectId = Guid.NewGuid();
@@ -152,15 +157,11 @@ namespace NHDAL.Tests.Domains
 
             // wire inverse collections
             var records = locations.Values.Concat(connections).ToList();
-            /*
             foreach (var record in records)
             {
-                if (record.EntityType == locationType)
-                    locationType.EntityRecords.Add(record);
-                else
-                    connectionType.EntityRecords.Add(record);
+                record.EntityType.EntityRecords.Add(record);
             }
-            */
+
             return (types, attributes, records);
         }
 

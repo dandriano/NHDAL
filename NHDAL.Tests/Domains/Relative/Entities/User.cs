@@ -6,9 +6,7 @@ namespace NHDAL.Tests.Domains.Relative.Entities
 {
     public class User : IEntity<Guid>
     {
-        public static User Nobody { get; } = new User() { Id = Guid.Empty };
-
-        public virtual Guid Id { get; init; } = Guid.NewGuid();
+        public virtual Guid Id { get; init; } = Guid.Empty;
         public virtual DateTime Timestamp { get; protected set; }
         public virtual string Name { get; set; } = string.Empty;
         public virtual ISet<Post> Posts { get; set; } = new HashSet<Post>();

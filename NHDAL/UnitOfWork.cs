@@ -1,5 +1,6 @@
 using NHDAL.Interfaces;
 using NHibernate;
+using NHibernate.Envers;
 using NHibernate.Persister.Entity;
 using System.Collections.Generic;
 using System.Linq;
@@ -153,6 +154,11 @@ namespace NHDAL
             {
                 _session.Dispose();
             }
+        }
+
+        public IAuditReader GetAuditReader()
+        {
+            return AuditReaderFactory.Get(_session);
         }
     }
 }

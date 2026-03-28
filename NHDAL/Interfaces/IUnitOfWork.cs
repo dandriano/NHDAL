@@ -1,4 +1,5 @@
 using NHibernate;
+using NHibernate.Envers;
 using NHibernate.Persister.Entity;
 using System;
 using System.Collections.Generic;
@@ -33,5 +34,6 @@ namespace NHDAL.Interfaces
         void Rollback();
         Task CommitAsync();
         Task RollbackAsync();
+        IAuditReader GetAuditReader();
     }
 }

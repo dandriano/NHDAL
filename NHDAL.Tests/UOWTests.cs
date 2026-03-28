@@ -3,6 +3,7 @@ using NHDAL.Tests.Domains;
 using NHDAL.Tests.Domains.EAV.Entities;
 using NHDAL.Tests.Domains.Relative.Entities;
 using NHibernate;
+using NHibernate.Envers.Query;
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
@@ -53,7 +54,8 @@ namespace NHDAL.Tests
         [Test]
         public void Basic_InsertTest()
         {
-            (var users, var posts, var comments) = DomainsHelper.GenerateRelativeDomainData();
+            var (users, posts, comments) = DomainsHelper.GenerateRelativeDomainData();
+
             if (!_db.TryOpenUnitOfWork(out var ctx))
             {
                 Assert.Fail();
@@ -97,8 +99,6 @@ namespace NHDAL.Tests
             using (ctx)
             {
                 ctx.MergeMany(types);
-                ctx.MergeMany(attributes);
-                ctx.MergeMany(records);
                 ctx.Commit();
             }
 
@@ -117,6 +117,23 @@ namespace NHDAL.Tests
                     Assert.That(ctx.Query<Entity>().ToList(), Has.Count.EqualTo(types.Count));
                     Assert.That(ctx.Query<Domains.EAV.Entities.Attribute>().ToList(), Has.Count.EqualTo(attributes.Count));
                     Assert.That(ctx.Query<EntityRecord>().ToList(), Has.Count.EqualTo(records.Count));
+                });
+
+                var audit = ctx.GetAuditReader();
+                var auditedRecord = records.First();
+
+                var revFromVersion = audit.GetRevisionNumberForDate(auditedRecord.Timestamp);
+                var revFromNow = audit.GetRevisionNumberForDate(DateTime.UtcNow);
+                // var historyRecord = audit.Find<EntityRecord>(auditedRecord, revFromVersion);
+                var historyRecord = audit.CreateQuery()
+                    .ForEntitiesAtRevision<EntityRecord>(revFromVersion)
+                    .Add(AuditEntity.Id().Eq(auditedRecord.Id))
+                    .Single();
+
+                Assert.Multiple(() =>
+                {
+                    Assert.That(revFromVersion, Is.EqualTo(revFromNow));
+                    Assert.That(auditedRecord.Id, Is.EqualTo(historyRecord.Id));
                 });
             }
         }
@@ -388,7 +405,6 @@ namespace NHDAL.Tests
         public async Task Concurrency_OptimisticLockWithinUOWBoundaries_Test(int concurrencyLimit)
         {
             (var users, _, _) = DomainsHelper.GenerateRelativeDomainData();
-            var targetId = users[^1].Id;
 
             if (!_db.TryOpenUnitOfWork(out var ctx))
             {
@@ -401,6 +417,7 @@ namespace NHDAL.Tests
                 await ctx.CommitAsync();
             }
 
+            var targetId = users[^1].Id;
             var s = DateTime.Now;
             var tasks = Enumerable
                 .Range(1, concurrencyLimit)
@@ -442,7 +459,6 @@ namespace NHDAL.Tests
         public async Task Concurrency_OptimisticLockOutsideUOWBoundaries_Test(int concurrencyLimit)
         {
             (var users, _, _) = DomainsHelper.GenerateRelativeDomainData();
-            var targetId = users[^1].Id;
 
             if (!_db.TryOpenUnitOfWork(out var ctx))
             {
@@ -455,6 +471,7 @@ namespace NHDAL.Tests
                 await ctx.CommitAsync();
             }
 
+            var targetId = users[^1].Id;
             var s = DateTime.Now;
             var tasks = Enumerable
                 .Range(1, concurrencyLimit)
@@ -467,7 +484,7 @@ namespace NHDAL.Tests
 
                         Thread.Sleep(new Random().Next(1, concurrencyLimit) * 100);
                         TestContext.WriteLine($"{DateTime.Now.Subtract(s).TotalMilliseconds:f0} ms\tuser:{i}\tstart");
-                        var toEdit = User.Nobody;
+                        User toEdit = null!;
                         using (var ctx = _db.OpenUnitOfWork())
                         {
                             toEdit = ctx.Query<User>().Single(u => u.Id == targetId);

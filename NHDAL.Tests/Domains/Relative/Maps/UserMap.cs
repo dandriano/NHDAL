@@ -17,7 +17,7 @@ namespace NHDAL.Tests.Domains.Relative.Maps
             DynamicUpdate(true);
             OptimisticLock(OptimisticLockMode.Version);
 
-            Id(x => x.Id, map => { map.Column("\"id\""); map.Generator(Generators.Assigned); });
+            Id(x => x.Id, map => { map.Column("\"id\""); map.Generator(Generators.GuidComb); map.UnsavedValue(Guid.Empty); });
             Version(x => x.Timestamp, map =>
             {
                 map.Column("\"version\"");
