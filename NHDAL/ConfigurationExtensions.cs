@@ -1,5 +1,6 @@
 using NHibernate.Cfg;
-using NHibernate.Extensions.Npgsql;
+using NHibernate.Dialect;
+using NHibernate.Driver;
 using NHibernate.Mapping.ByCode;
 using System;
 using System.Collections.Generic;
@@ -65,14 +66,14 @@ namespace NHDAL
                                              .Where(type => type.Namespace?.EndsWith("Entities") ?? false));
 
             cfg.AddMappings(mappings, entities);
-            cfg.SetupDataBaseIntegration<NpgsqlDialect, NpgsqlDriver>(sb.ToString());
+            cfg.SetupDataBaseIntegration<PostgreSQL83Dialect, NpgsqlDriver>(sb.ToString());
             cfg.IntegrateWithEnvers();
 
             return cfg;
         }
         public static Configuration SetupDataBaseIntegration<TDialect, TDriver>(this Configuration config, string connectionString)
-            where TDialect : NHibernate.Dialect.Dialect
-            where TDriver : NHibernate.Driver.IDriver
+            where TDialect : Dialect
+            where TDriver : IDriver
         {
             config.DataBaseIntegration(db =>
             {

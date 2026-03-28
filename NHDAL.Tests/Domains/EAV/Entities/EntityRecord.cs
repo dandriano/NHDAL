@@ -2,7 +2,6 @@ using NHDAL.Interfaces;
 using NHibernate.Envers.Configuration.Attributes;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace NHDAL.Tests.Domains.EAV.Entities
 {
@@ -16,14 +15,6 @@ namespace NHDAL.Tests.Domains.EAV.Entities
         public virtual Entity EntityType { get; set; } = null!;
         public virtual ISet<AttributeRecord> AttributeMap { get; set; } = new HashSet<AttributeRecord>();
         public virtual ISet<EntityRecordRelation> RelationMap { get; set; } = new HashSet<EntityRecordRelation>();
-
-        protected string GetAttributeValue(string attrName)
-        {
-            var attribute = EntityType.Attributes.Single(a => a.Name == attrName);
-            var value = AttributeMap.Single(av => av.AttributeId == attribute.Id).Value;
-
-            return value;
-        }
     }
 
     public class AttributeRecord

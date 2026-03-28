@@ -9,7 +9,6 @@
     <PackageReference Include="Microsoft.Extensions.Options" Version="9.0.5" />
     <PackageReference Include="NHibernate" Version="5.6.0" />
     <PackageReference Include="NHibernate.Envers" Version="5.6.0" />
-    <PackageReference Include="NHibernate.Extensions.Npgsql" Version="8.0.14" />
   </ItemGroup>
  
 </Project>

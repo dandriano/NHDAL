@@ -13,13 +13,14 @@ namespace NHDAL.Interfaces
     /// TODO: Comments
     /// </summary>
     /// <remarks>
-    /// Just more strict interace than <see cref="ISession"/>
+    /// Just a more strict interace than <see cref="ISession"/>
     /// </remarks>
     public interface IUnitOfWork : IDisposable
     {
         IEntityPersister GetPersister<TEntity>() where TEntity : class;
         ISQLQuery CreateSQLQuery(string sql);
         IQueryable<TEntity> Query<TEntity>() where TEntity : class;
+        IQueryOver<TEntity, TEntity> QueryOver<TEntity>() where TEntity : class;
         bool Contains(object obj);
         void Delete(object obj);
         Task DeleteAsync(object obj, CancellationToken cancellationToken = default);

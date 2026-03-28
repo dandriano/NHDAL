@@ -1,5 +1,4 @@
 using NHDAL.Tests.Domains.EAV.Entities;
-using NHibernate.Extensions.Npgsql;
 using NHibernate.Mapping.ByCode;
 using NHibernate.Mapping.ByCode.Conformist;
 using NHibernate.Type;
