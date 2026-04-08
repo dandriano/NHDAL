@@ -2,6 +2,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using NHDAL.Interfaces;
+using NUnit.Framework;
 using System.Threading.Tasks;
 using Testcontainers.PostgreSql;
 
@@ -16,6 +18,7 @@ namespace NHDAL.Tests
         private PostgreSqlContainer _db = null!;
         protected ServiceProvider _serviceProvider = null!;
 
+        [OneTimeSetUp]
         public virtual async Task OneTimeSetup()
         {
             var services = new ServiceCollection();
@@ -51,12 +54,18 @@ namespace NHDAL.Tests
             services.AddSingleton<ILoggerFactory>(NullLoggerFactory.Instance);
             services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
 
+            // unit of work
             services.Configure<UnitOfWorkFactoryOptions>(config.GetSection(nameof(UnitOfWorkFactoryOptions)));
-            // transient between tests, testing dispose
-            services.AddTransient<UnitOfWorkFactory>();
+            services.AddSingleton<IUnitOfWorkFactory, UnitOfWorkFactory>();
+            services.AddScoped<IUnitOfWork>(sp => 
+                sp.GetRequiredService<IUnitOfWorkFactory>().OpenUnitOfWork());
+            
+            // scope executor
+            services.AddSingleton<IUnitOfWorkRunner, UnitOfWorkExecutor>();
 
             _serviceProvider = services.BuildServiceProvider();
         }
+        [OneTimeTearDown]
         public virtual async Task OneTimeTearDown()
         {
             await _db.DisposeAsync();

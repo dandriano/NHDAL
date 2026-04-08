@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Options;
 using NHDAL.Interfaces;
 using NHibernate;
-using NHibernate.Tool.hbm2ddl;
 using System;
 using System.Diagnostics.CodeAnalysis;
 
@@ -38,11 +37,6 @@ namespace NHDAL
                 return false;
             }
         }
-        public void BuildSchema()
-        {
-            new SchemaExport(ConfigurationExtensions.CreateConfiguration(_options)).Create(false, true);
-        }
-
         public void Dispose()
         {
             _sessionFactory.Dispose();

@@ -2,7 +2,9 @@ using NHDAL.Interfaces;
 using NHibernate;
 using NHibernate.Envers;
 using NHibernate.Persister.Entity;
+using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -22,34 +24,45 @@ namespace NHDAL
     public class UnitOfWork : IUnitOfWork
     {
         private readonly ISession _session;
-        private ITransaction? _transaction;
+        private readonly Lazy<ITransaction> _lazyTransaction;
+        private ITransaction _transaction => _lazyTransaction.Value;
 
         public UnitOfWork(ISession session)
         {
             _session = session;
             _session.FlushMode = FlushMode.Commit;
+            _lazyTransaction = new Lazy<ITransaction>(() => EnsureTransaction());
         }
         #region [Transaction]
-        private void EnsureTransaction()
+        private ITransaction EnsureTransaction()
         {
-            _transaction ??= _session.BeginTransaction();
+            var t = _session.GetCurrentTransaction();
+            t ??= _session.BeginTransaction(IsolationLevel.ReadCommitted); 
+            
+            return t;
         }
         public void Commit()
         {
-            EnsureTransaction();
-            if (_transaction?.IsActive == true)
-                _transaction.Commit();
+            if (!_transaction.IsActive)
+                return;
+
+            _session.Flush();
+            _transaction.Commit(); 
         }
         public void Rollback()
         {
-            if (_transaction?.IsActive == true)
-                _transaction.Rollback();
+            if (!_transaction.IsActive)
+                return;
+            
+            _transaction.Rollback();
         }
         public async Task CommitAsync()
         {
-            EnsureTransaction();
-            if (_transaction?.IsActive == true)
-                await _transaction.CommitAsync().ConfigureAwait(false);
+            if (!_transaction.IsActive)
+                return;
+            
+            await _session.FlushAsync().ConfigureAwait(false);
+            await _transaction.CommitAsync().ConfigureAwait(false);
         }
         public async Task RollbackAsync()
         {

@@ -68,6 +68,9 @@ namespace NHDAL
             cfg.SetupDataBaseIntegration<NpgsqlDialect, NpgsqlDriver>(sb.ToString());
             cfg.IntegrateWithEnvers();
 
+            cfg.SetProperty("transaction.use_connection_on_system_prepare", "false");
+            cfg.SetProperty("flush_mode", "Commit");
+
             return cfg;
         }
         public static Configuration SetupDataBaseIntegration<TDialect, TDriver>(this Configuration config, string connectionString)

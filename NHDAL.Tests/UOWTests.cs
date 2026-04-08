@@ -1,9 +1,12 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using NHDAL.Interfaces;
 using NHDAL.Tests.Domains;
 using NHDAL.Tests.Domains.EAV.Entities;
 using NHDAL.Tests.Domains.Relative.Entities;
 using NHibernate;
 using NHibernate.Envers.Query;
+using NHibernate.Tool.hbm2ddl;
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
@@ -16,108 +19,111 @@ namespace NHDAL.Tests
     [TestFixture]
     public class UOWTests : RegistrarBase
     {
-        private UnitOfWorkFactory _db;
+        IUnitOfWorkRunner _scopeExecutor = null!;
 
-        [OneTimeSetUp]
-        public override async Task OneTimeSetup()
-        {
-            await base.OneTimeSetup();
-
-            _db = _serviceProvider.GetRequiredService<UnitOfWorkFactory>();
-        }
         [SetUp]
         public void SetUp()
         {
-            _db.BuildSchema();
-        }
-        [OneTimeTearDown]
-        public override async Task OneTimeTearDown()
-        {
-            _db.Dispose();
+            var options = _serviceProvider.GetRequiredService<IOptions<UnitOfWorkFactoryOptions>>();
+            new SchemaExport(ConfigurationExtensions.CreateConfiguration(options.Value)).Create(false, true);
 
-            await base.OneTimeTearDown();
+            _scopeExecutor = _serviceProvider.GetRequiredService<IUnitOfWorkRunner>();
         }
+        
         [Test]
         public void Basic_BuildSchemaTest()
         {
-            if (!_db.TryOpenUnitOfWork(out var ctx))
-            {
-                Assert.Fail();
-                return;
-            }
 
-            using (ctx)
+            var userCount = _scopeExecutor.Run(sp =>
             {
-                Assert.That(ctx.Query<User>().ToList(), Has.Count.Zero);
-            }
+                var ctx = sp.GetRequiredService<IUnitOfWork>();
+
+                return ctx.Query<User>().ToList().Count;
+            });
+
+            Assert.That(userCount, Is.Zero);
         }
         [Test]
         public void Basic_InsertTest()
         {
             var (users, posts, comments) = DomainsHelper.GenerateRelativeDomainData();
 
-            if (!_db.TryOpenUnitOfWork(out var ctx))
+            _scopeExecutor.Run(sp =>
             {
-                Assert.Fail();
-                return;
-            }
+                var ctx = sp.GetRequiredService<IUnitOfWork>();
 
-            using (ctx)
-            {
                 ctx.MergeMany(users);
-                ctx.Commit();
-            }
+            });
 
             Thread.Sleep(500);
 
-            if (!_db.TryOpenUnitOfWork(out ctx))
+            var (userCount, postCount, commentCount) = _scopeExecutor.Run(sp =>
             {
-                Assert.Fail();
-                return;
-            }
+                var ctx = sp.GetRequiredService<IUnitOfWork>();
 
-            using (ctx)
+                var userCount = ctx.Query<User>().ToList().Count;
+                var postCount = ctx.Query<Post>().ToList().Count;
+                var commentCount = ctx.Query<Comment>().ToList().Count;
+
+                return (userCount, postCount, commentCount);
+            });
+
+            Assert.Multiple(() =>
             {
-                Assert.Multiple(() =>
-                {
-                    Assert.That(ctx.Query<User>().ToList(), Has.Count.EqualTo(users.Count));
-                    Assert.That(ctx.Query<Post>().ToList(), Has.Count.EqualTo(posts.Count));
-                    Assert.That(ctx.Query<Comment>().ToList(), Has.Count.EqualTo(comments.Count));
-                });
-            }
+                Assert.That(userCount, Is.EqualTo(users.Count));
+                Assert.That(postCount, Is.EqualTo(posts.Count));
+                Assert.That(commentCount, Is.EqualTo(comments.Count));
+            });
         }
         [Test]
         public void Basic_InsertEAVTest()
         {
             (var types, var attributes, var records) = DomainsHelper.GenerateEAVDomainData();
-            if (!_db.TryOpenUnitOfWork(out var ctx))
+            _scopeExecutor.Run(sp =>
             {
-                Assert.Fail();
-                return;
-            }
+                var ctx = sp.GetRequiredService<IUnitOfWork>();
 
-            using (ctx)
-            {
                 ctx.MergeMany(types);
-                ctx.Commit();
-            }
+            });
 
             Thread.Sleep(500);
 
-            if (!_db.TryOpenUnitOfWork(out ctx))
+            var (entityCount, attributeCount, recordCount) = _scopeExecutor.Run(sp =>
             {
-                Assert.Fail();
-                return;
-            }
+                var ctx = sp.GetRequiredService<IUnitOfWork>();
 
-            using (ctx)
+                var entityCount = ctx.Query<Entity>().ToList().Count;
+                var attributeCount = ctx.Query<Domains.EAV.Entities.Attribute>().ToList().Count;
+                var recordCount = ctx.Query<EntityRecord>().ToList().Count;
+
+                return (entityCount, attributeCount, recordCount);
+            });
+
+            Assert.Multiple(() =>
             {
-                Assert.Multiple(() =>
-                {
-                    Assert.That(ctx.Query<Entity>().ToList(), Has.Count.EqualTo(types.Count));
-                    Assert.That(ctx.Query<Domains.EAV.Entities.Attribute>().ToList(), Has.Count.EqualTo(attributes.Count));
-                    Assert.That(ctx.Query<EntityRecord>().ToList(), Has.Count.EqualTo(records.Count));
-                });
+                Assert.That(entityCount, Is.EqualTo(types.Count));
+                Assert.That(attributeCount, Is.EqualTo(attributes.Count));
+                Assert.That(recordCount, Is.EqualTo(records.Count));
+            });
+
+            Thread.Sleep(500);
+
+            _scopeExecutor.Run(sp =>
+            {
+                var ctx = sp.GetRequiredService<IUnitOfWork>();
+
+                var entityCount = ctx.Query<Entity>().ToList().Count;
+                var attributeCount = ctx.Query<Domains.EAV.Entities.Attribute>().ToList().Count;
+                var recordCount = ctx.Query<EntityRecord>().ToList().Count;
+
+                return (entityCount, attributeCount, recordCount);
+            });
+
+            Thread.Sleep(500);
+
+            _scopeExecutor.Run(sp =>
+            {
+                var ctx = sp.GetRequiredService<IUnitOfWork>();
 
                 var audit = ctx.GetAuditReader();
                 var auditedRecord = records.First();
@@ -135,12 +141,14 @@ namespace NHDAL.Tests
                     Assert.That(revFromVersion, Is.EqualTo(revFromNow));
                     Assert.That(auditedRecord.Id, Is.EqualTo(historyRecord.Id));
                 });
-            }
+            });
         }
         [Test]
         public void Basic_VersionIncrement_Test()
         {
-            if (!_db.TryOpenUnitOfWork(out var ctx))
+            var db = _serviceProvider.GetRequiredService<IUnitOfWorkFactory>();
+
+            if (!db.TryOpenUnitOfWork(out var ctx))
             {
                 Assert.Fail();
                 return;
@@ -154,7 +162,7 @@ namespace NHDAL.Tests
             }
 
             var initialTimestamp = user.Timestamp;
-            if (!_db.TryOpenUnitOfWork(out ctx))
+            if (!db.TryOpenUnitOfWork(out ctx))
             {
                 Assert.Fail();
                 return;
@@ -171,7 +179,7 @@ namespace NHDAL.Tests
                 ctx.Commit();
             }
 
-            if (!_db.TryOpenUnitOfWork(out ctx))
+            if (!db.TryOpenUnitOfWork(out ctx))
             {
                 Assert.Fail();
                 return;
@@ -187,7 +195,9 @@ namespace NHDAL.Tests
         public void Basic_VersionNotIncrement_ReturnsFromCache_Test()
         {
             (var users, _, _) = DomainsHelper.GenerateRelativeDomainData();
-            if (!_db.TryOpenUnitOfWork(out var ctx))
+
+            var db = _serviceProvider.GetRequiredService<IUnitOfWorkFactory>();
+            if (!db.TryOpenUnitOfWork(out var ctx))
             {
                 Assert.Fail();
                 return;
@@ -202,7 +212,7 @@ namespace NHDAL.Tests
             Thread.Sleep(1500);
             users[0].Name = "Incognito";
 
-            if (!_db.TryOpenUnitOfWork(out ctx))
+            if (!db.TryOpenUnitOfWork(out ctx))
             {
                 Assert.Fail();
                 return;
@@ -223,7 +233,9 @@ namespace NHDAL.Tests
         public void Basic_VersionNotIncrement_Merge_Test()
         {
             (var users, _, _) = DomainsHelper.GenerateRelativeDomainData();
-            if (!_db.TryOpenUnitOfWork(out var ctx))
+
+            var db = _serviceProvider.GetRequiredService<IUnitOfWorkFactory>();
+            if (!db.TryOpenUnitOfWork(out var ctx))
             {
                 Assert.Fail();
                 return;
@@ -238,7 +250,7 @@ namespace NHDAL.Tests
             Thread.Sleep(1500);
             users[0].Name = "Incognito";
 
-            if (!_db.TryOpenUnitOfWork(out ctx))
+            if (!db.TryOpenUnitOfWork(out ctx))
             {
                 Assert.Fail();
                 return;
@@ -265,7 +277,9 @@ namespace NHDAL.Tests
         public void Basic_VersionIncrement_ReturnsFromCache_Test()
         {
             (var users, _, _) = DomainsHelper.GenerateRelativeDomainData();
-            if (!_db.TryOpenUnitOfWork(out var ctx))
+
+            var db = _serviceProvider.GetRequiredService<IUnitOfWorkFactory>();
+            if (!db.TryOpenUnitOfWork(out var ctx))
             {
                 Assert.Fail();
                 return;
@@ -280,7 +294,7 @@ namespace NHDAL.Tests
             var detachedUser = users[0];
             detachedUser.Name = "Incognito";
             Thread.Sleep(1500);
-            if (!_db.TryOpenUnitOfWork(out ctx))
+            if (!db.TryOpenUnitOfWork(out ctx))
             {
                 Assert.Fail();
                 return;
@@ -301,7 +315,7 @@ namespace NHDAL.Tests
                 });
             }
 
-            if (!_db.TryOpenUnitOfWork(out ctx))
+            if (!db.TryOpenUnitOfWork(out ctx))
             {
                 Assert.Fail();
                 return;
@@ -322,7 +336,9 @@ namespace NHDAL.Tests
         public void Basic_VersionIncrement_Merge_Test()
         {
             (var users, _, _) = DomainsHelper.GenerateRelativeDomainData();
-            if (!_db.TryOpenUnitOfWork(out var ctx))
+
+            var db = _serviceProvider.GetRequiredService<IUnitOfWorkFactory>();
+            if (!db.TryOpenUnitOfWork(out var ctx))
             {
                 Assert.Fail();
                 return;
@@ -336,7 +352,7 @@ namespace NHDAL.Tests
             var detachedUser = users[0];
             detachedUser.Name = "Incognito";
             Thread.Sleep(1500);
-            if (!_db.TryOpenUnitOfWork(out ctx))
+            if (!db.TryOpenUnitOfWork(out ctx))
             {
                 Assert.Fail();
                 return;
@@ -357,7 +373,7 @@ namespace NHDAL.Tests
                 });
             }
 
-            if (!_db.TryOpenUnitOfWork(out ctx))
+            if (!db.TryOpenUnitOfWork(out ctx))
             {
                 Assert.Fail();
                 return;
@@ -382,15 +398,19 @@ namespace NHDAL.Tests
                 .Select(i =>
                     Task.Run(() =>
                     {
-                        using var ctx = _db.OpenUnitOfWork();
-                        ctx.Merge(new User { Name = $"Incognito{i}" });
-                        ctx.Commit();
+                        _scopeExecutor.Run(sp =>
+                        {
+                            var ctx = sp.GetRequiredService<IUnitOfWork>();
+
+                            ctx.Merge(new User { Name = $"Incognito{i}" });
+                        });
                     })
                 );
 
             await Task.WhenAll(tasks);
 
-            if (!_db.TryOpenUnitOfWork(out var ctx))
+            var db = _serviceProvider.GetRequiredService<IUnitOfWorkFactory>();
+            if (!db.TryOpenUnitOfWork(out var ctx))
             {
                 Assert.Fail();
                 return;
@@ -402,20 +422,16 @@ namespace NHDAL.Tests
             }
         }
         [TestCase(5)]
-        public async Task Concurrency_OptimisticLockWithinUOWBoundaries_Test(int concurrencyLimit)
+        public async Task Concurrency_OptimisticLock_Test(int concurrencyLimit)
         {
-            (var users, _, _) = DomainsHelper.GenerateRelativeDomainData();
+            var (users, _, _) = DomainsHelper.GenerateRelativeDomainData();
 
-            if (!_db.TryOpenUnitOfWork(out var ctx))
+            await _scopeExecutor.RunAsync(async sp =>
             {
-                Assert.Fail();
-                return;
-            }
-            using (ctx)
-            {
+                var ctx = sp.GetRequiredService<IUnitOfWork>();
+
                 await ctx.MergeManyAsync(users);
-                await ctx.CommitAsync();
-            }
+            });
 
             var targetId = users[^1].Id;
             var s = DateTime.Now;
@@ -424,81 +440,25 @@ namespace NHDAL.Tests
                 .Select(i =>
                     Task.Run(() =>
                     {
-                        // optimistic concurrency in the example below 
-                        // within the bounds of the ISession 
                         var success = true;
-
-                        Thread.Sleep(new Random().Next(1, concurrencyLimit) * 100);
-                        TestContext.WriteLine($"{DateTime.Now.Subtract(s).TotalMilliseconds:f0} ms\tuser:{i}\tstart");
-                        using var ctx = _db.OpenUnitOfWork();
-                        var toEdit = ctx.Query<User>().Single(u => u.Id == targetId);
-
-                        Thread.Sleep(new Random().Next(concurrencyLimit, concurrencyLimit ^ 2) * 1000);
-                        TestContext.WriteLine($"{DateTime.Now.Subtract(s).TotalMilliseconds:f0} ms\tuser:{i}\tflush");
-                        toEdit.Name = $"HELLO WORLD FROM user{i}";
 
                         try
                         {
-                            ctx.Merge(toEdit);
-                            ctx.Commit();
-                        }
-                        catch (StaleObjectStateException)
-                        {
-                            success = false;
-                        }
+                            _scopeExecutor.Run(sp =>
+                            {
+                                Thread.Sleep(new Random().Next(1, concurrencyLimit) * 100);
+                                TestContext.WriteLine($"{DateTime.Now.Subtract(s).TotalMilliseconds:f0} ms\tuser:{i}\tstart");
+                                
+                                var ctx = sp.GetRequiredService<IUnitOfWork>();
 
-                        TestContext.WriteLine($"{DateTime.Now.Subtract(s).TotalMilliseconds:f0} ms\tuser:{i}\tend succeeded:{success}");
-                        return success;
-                    })
-                );
+                                var toEdit =  ctx.Query<User>().Single(u => u.Id == targetId);
 
-            var results = await Task.WhenAll(tasks);
-            Assert.That(results.Count(succeeded => succeeded), Is.EqualTo(1));
-        }
-        [TestCase(5)]
-        public async Task Concurrency_OptimisticLockOutsideUOWBoundaries_Test(int concurrencyLimit)
-        {
-            (var users, _, _) = DomainsHelper.GenerateRelativeDomainData();
+                                Thread.Sleep(new Random().Next(concurrencyLimit, concurrencyLimit ^ 2) * 1000);
+                                TestContext.WriteLine($"{DateTime.Now.Subtract(s).TotalMilliseconds:f0} ms\tuser:{i}\tflush");
+                                toEdit.Name = $"HELLO WORLD FROM user{i}";
 
-            if (!_db.TryOpenUnitOfWork(out var ctx))
-            {
-                Assert.Fail();
-                return;
-            }
-            using (ctx)
-            {
-                await ctx.MergeManyAsync(users);
-                await ctx.CommitAsync();
-            }
-
-            var targetId = users[^1].Id;
-            var s = DateTime.Now;
-            var tasks = Enumerable
-                .Range(1, concurrencyLimit)
-                .Select(i =>
-                    Task.Run(() =>
-                    {
-                        // optimistic concurrency in the example below 
-                        // outside of the bounds of the ISession 
-                        var success = true;
-
-                        Thread.Sleep(new Random().Next(1, concurrencyLimit) * 100);
-                        TestContext.WriteLine($"{DateTime.Now.Subtract(s).TotalMilliseconds:f0} ms\tuser:{i}\tstart");
-                        User toEdit = null!;
-                        using (var ctx = _db.OpenUnitOfWork())
-                        {
-                            toEdit = ctx.Query<User>().Single(u => u.Id == targetId);
-                        }
-
-                        Thread.Sleep(new Random().Next(concurrencyLimit, concurrencyLimit ^ 2) * 1000);
-                        TestContext.WriteLine($"{DateTime.Now.Subtract(s).TotalMilliseconds:f0} ms\tuser:{i}\tflush");
-                        toEdit.Name = $"HELLO WORLD FROM user{i}";
-
-                        try
-                        {
-                            using var ctx = _db.OpenUnitOfWork();
-                            ctx.Merge(toEdit);
-                            ctx.Commit();
+                                ctx.Merge(toEdit);
+                            });
                         }
                         catch (StaleObjectStateException)
                         {
